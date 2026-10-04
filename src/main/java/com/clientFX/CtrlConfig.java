@@ -5,13 +5,10 @@ import java.util.ResourceBundle;
 
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 
-/**
- * Controlador de la primera vista: configuració de la connexió al
- * servidor (protocol, host, port) i nom del jugador.
- */
 public class CtrlConfig implements Initializable {
 
     @FXML
@@ -27,10 +24,15 @@ public class CtrlConfig implements Initializable {
     public TextField txtPort;
 
     @FXML
+    public Button btnConnect;
+
+    @FXML
     public Label txtMessage;
 
     @Override
     public void initialize(URL url, ResourceBundle rb) {
+        // Enter al camp del nom també connecta
+        txtName.setOnAction(event -> connectToServer());
     }
 
     @FXML

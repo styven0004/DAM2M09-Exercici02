@@ -5,12 +5,14 @@ com\clientCMD\UtilsWS$1.class
 com\server\SudokuGame.class
 com\clientFX\CtrlConfig.class
 com\clientFX\UtilsWS$1.class
-com\server\ClientRegistry$PlayerInfo.class
+com\server\Main$1.class
 com\clientCMD\Main.class
+com\server\SudokuGame$MoveResult.class
 com\clientFX\CtrlSockets.class
 com\server\ClientRegistry.class
 com\clientFX\CtrlGame.class
 com\clientFX\UtilsWS.class
 com\clientFX\UtilsViews.class
+com\server\SudokuPuzzle.class
 com\clientFX\CtrlRanking.class
 com\clientCMD\UtilsWS.class

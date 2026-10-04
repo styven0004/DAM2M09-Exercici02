@@ -1,53 +1,51 @@
 package com.server;
 
 import org.java_websocket.WebSocket;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
-import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Registre dels jugadors connectats: nom, socket associat i puntuació.
+ * Registre de clients connectats.
  *
- * Si dos jugadors demanen el mateix nom, s'afegeix un sufix numèric al
- * segon perquè els noms siguin sempre únics dins la partida.
+ * Manté dos mapes bidireccionals:
+ * - WebSocket a nom de jugador
+ * - Nom de jugador a WebSocket
  *
- * Aquesta classe és segura per a ús concurrent: els mètodes que llegeixen
- * o modifiquen més d'un mapa a la vegada estan sincronitzats.
+ * A diferència de l'exemple original (que assignava noms d'un pool), aquí
+ * el nom el tria el jugador a la vista de configuració. Si ja està en ús
+ * se li afegeix un sufix numèric: "Albert", "Albert (2)", ...
  */
 final class ClientRegistry {
 
-    private static final class PlayerInfo {
-        final String name;
-        int score;
+    static final int MAX_NAME_LENGTH = 16;
+    static final String DEFAULT_NAME = "Jugador";
 
-        PlayerInfo(String name) {
-            this.name = name;
-            this.score = 0;
-        }
-    }
+    /** Mapa de sockets a noms de jugador. */
+    private final Map<WebSocket, String> bySocket = new ConcurrentHashMap<>();
 
-    private final Map<WebSocket, PlayerInfo> bySocket = new ConcurrentHashMap<>();
-    private final Map<String, WebSocket> byName = new LinkedHashMap<>();
+    /** Mapa de noms de jugador a sockets. */
+    private final Map<String, WebSocket> byName = new ConcurrentHashMap<>();
 
     /**
-     * Afegeix un jugador nou, resolent col·lisions de nom afegint un sufix.
+     * Registra un socket amb el nom desitjat (net i únic).
      *
-     * @param socket        socket del client
-     * @param requestedName nom que ha demanat el jugador
-     * @return el nom finalment assignat (pot ser diferent del demanat)
+     * @param socket  socket del client
+     * @param desired nom que vol el jugador (pot ser buit o null)
+     * @return el nom finalment assignat
      */
-    synchronized String add(WebSocket socket, String requestedName) {
-        String name = requestedName;
-        int suffix = 2;
+    synchronized String register(WebSocket socket, String desired) {
+        String base = desired == null ? "" : desired.trim();
+        if (base.isEmpty()) base = DEFAULT_NAME;
+        if (base.length() > MAX_NAME_LENGTH) base = base.substring(0, MAX_NAME_LENGTH).trim();
+
+        String name = base;
+        int n = 2;
         while (byName.containsKey(name)) {
-            name = requestedName + " (" + suffix + ")";
-            suffix++;
+            name = base + " (" + n + ")";
+            n++;
         }
-        bySocket.put(socket, new PlayerInfo(name));
+        bySocket.put(socket, name);
         byName.put(name, socket);
         return name;
     }
@@ -55,54 +53,35 @@ final class ClientRegistry {
     /**
      * Elimina un client del registre.
      *
-     * @return el nom que tenia assignat, o null si no hi era
+     * @param socket socket del client a eliminar
+     * @return el nom que tenia, o null si no estava registrat
      */
     synchronized String remove(WebSocket socket) {
-        PlayerInfo info = bySocket.remove(socket);
-        if (info != null) {
-            byName.remove(info.name);
-            return info.name;
-        }
-        return null;
+        String name = bySocket.remove(socket);
+        if (name != null) byName.remove(name);
+        return name;
     }
 
-    /** Nom associat a un socket, o null si encara no ha fet "join". */
+    /** Nom associat a un socket, o null si encara no s'ha fet join. */
     String nameBySocket(WebSocket socket) {
-        PlayerInfo info = bySocket.get(socket);
-        return info == null ? null : info.name;
+        return bySocket.get(socket);
     }
 
-    /** Suma (o resta, amb delta negatiu) punts a un jugador pel seu nom. */
-    synchronized void addScore(String name, int delta) {
-        WebSocket socket = byName.get(name);
-        if (socket == null) return;
-        PlayerInfo info = bySocket.get(socket);
-        if (info != null) {
-            info.score += delta;
-        }
+    /** Socket associat a un nom, o null si no existeix. */
+    WebSocket socketByName(String name) {
+        return byName.get(name);
     }
 
-    /** Posa totes les puntuacions a zero (utilitzat en "tornar a jugar"). */
-    synchronized void resetScores() {
-        for (PlayerInfo info : bySocket.values()) {
-            info.score = 0;
-        }
+    /**
+     * Neteja el registre per a un socket desconnectat.
+     * Equivalent a remove(socket).
+     */
+    String cleanupDisconnected(WebSocket socket) {
+        return remove(socket);
     }
 
-    /** Sockets de tots els jugadors actualment connectats. */
-    Collection<WebSocket> sockets() {
-        return bySocket.keySet();
-    }
-
-    /** Llista de jugadors (nom + puntuació) en format JSON. */
-    synchronized JSONArray playersAsJson() {
-        JSONArray arr = new JSONArray();
-        for (PlayerInfo info : bySocket.values()) {
-            JSONObject o = new JSONObject();
-            o.put("name", info.name);
-            o.put("score", info.score);
-            arr.put(o);
-        }
-        return arr;
+    /** Còpia immutable de l'estat actual del mapa socket a nom. */
+    Map<WebSocket, String> snapshot() {
+        return Map.copyOf(bySocket);
     }
 }

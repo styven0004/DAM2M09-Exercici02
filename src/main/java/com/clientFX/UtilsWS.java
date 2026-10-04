@@ -22,6 +22,7 @@ public class UtilsWS {
     private Consumer<String> onErrorCallBack = null;
     private String location = "";
     private static AtomicBoolean exitRequested = new AtomicBoolean(false);
+    private volatile boolean disabled = false; // true quan aquesta instància s'ha descartat (resetSharedInstance)
     private ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     private UtilsWS(String location) {
@@ -67,7 +68,8 @@ public class UtilsWS {
                     if (onErrorCallBack != null) {
                         onErrorCallBack.accept(message);
                     }
-                    if (e.getMessage().contains("Connection refused") || e.getMessage().contains("Connection reset")) {
+                    String errMsg = e.getMessage() == null ? "" : e.getMessage();
+                    if (errMsg.contains("Connection refused") || errMsg.contains("Connection reset")) {
                         scheduleReconnect();
                     }
                 }
@@ -80,13 +82,13 @@ public class UtilsWS {
     }
 
     private void scheduleReconnect() {
-        if (!exitRequested.get()) {
+        if (!exitRequested.get() && !disabled) {
             scheduler.schedule(this::reconnect, 5, TimeUnit.SECONDS);
         }
     }
 
     private void reconnect() {
-        if (exitRequested.get()) {
+        if (exitRequested.get() || disabled) {
             return;
         }
 
@@ -103,6 +105,28 @@ public class UtilsWS {
             sharedInstance = new UtilsWS(location);
         }
         return sharedInstance;
+    }
+
+    // Descarta la instància compartida (atura reconnexions) perquè se'n pugui crear
+    // una de nova amb una altra adreça, p. ex. després d'un "Connection refused"
+    public static synchronized void resetSharedInstance() {
+        if (sharedInstance != null) {
+            sharedInstance.shutdown();
+            sharedInstance = null;
+        }
+    }
+
+    private void shutdown() {
+        disabled = true;
+        try {
+            if (client != null) {
+                client.close();
+            }
+        } catch (Exception e) {
+            System.out.println("WS Error closing client: " + e.getMessage());
+        } finally {
+            scheduler.shutdownNow();
+        }
     }
 
     public void onOpen(Consumer<String> callBack) {

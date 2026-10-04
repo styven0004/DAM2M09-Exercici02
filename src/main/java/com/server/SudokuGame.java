@@ -1,91 +1,114 @@
 package com.server;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
 
 /**
- * Estat d'una partida de Sudoku compartida per tots els jugadors connectats.
+ * Estat de la partida de Sudoku compartida per tots els jugadors.
  *
- * Manté la solució (oculta als clients), les caselles inicials (givens) i
- * les caselles que els jugadors han anat encertant, amb el nom de qui les
- * ha resolt.
+ * Tots els mètodes públics són sincronitzats: es poden cridar des de
+ * diferents fils de WebSocket. Qui necessiti un instantani coherent
+ * (p. ex. per serialitzar l'estat) pot fer synchronized(game).
  */
 final class SudokuGame {
 
-    private final int[][] solution = new int[9][9];
-    private final int[][] givens = new int[9][9];
-    private final int[][] filledValue = new int[9][9];
-    private final String[][] filledOwner = new String[9][9];
+    /** Resultat d'intentar posar un valor en una casella. */
+    enum MoveResult { CORRECT, WRONG, LOCKED, FINISHED, INVALID }
 
-    private int givenCount = 0;
-    private int filledCount = 0;
+    static final int SIZE = SudokuPuzzle.SIZE;
+    static final int HOLES = 45;
+    static final int POINTS_CORRECT = 2;
+    static final int POINTS_WRONG = -1;
+
+    private final Random rnd = new Random();
+    private final Map<String, Integer> scores = new HashMap<>();
+
+    private SudokuPuzzle puzzle;
+    private boolean[][] filled = new boolean[SIZE][SIZE];
+    private String[][] owner = new String[SIZE][SIZE];
+    private boolean finished;
 
     SudokuGame() {
-        SudokuGenerator.generate(solution, givens);
-        for (int r = 0; r < 9; r++) {
-            for (int c = 0; c < 9; c++) {
-                if (givens[r][c] != 0) {
-                    givenCount++;
-                }
-            }
+        newGame();
+    }
+
+    /** Genera un trencaclosques nou i posa a zero els punts de tots els jugadors. */
+    synchronized void newGame() {
+        puzzle = SudokuPuzzle.generate(HOLES, rnd);
+        filled = new boolean[SIZE][SIZE];
+        owner = new String[SIZE][SIZE];
+        for (int r = 0; r < SIZE; r++) {
+            for (int c = 0; c < SIZE; c++) filled[r][c] = puzzle.given[r][c];
         }
+        scores.replaceAll((name, pts) -> 0);
+        finished = false;
+    }
+
+    /** Afegeix un jugador (si la sala estava buida i la partida acabada, comença una de nova). */
+    synchronized void addPlayer(String name) {
+        if (scores.isEmpty() && finished) newGame();
+        scores.putIfAbsent(name, 0);
+    }
+
+    /** Treu un jugador. Si la sala es queda buida, es prepara una partida nova. */
+    synchronized void removePlayer(String name) {
+        scores.remove(name);
+        if (scores.isEmpty()) newGame();
     }
 
     /**
-     * Indica si una casella es pot omplir (no és una pista inicial i encara
-     * no ha estat encertada per cap jugador).
+     * Intenta posar un valor. Si és correcte la casella queda bloquejada
+     * i el jugador suma 2 punts; si no, resta 1 punt.
      */
-    boolean isEditable(int row, int col) {
-        return givens[row][col] == 0 && filledValue[row][col] == 0;
-    }
-
-    /**
-     * Intenta omplir una casella amb un valor. Si el valor coincideix amb la
-     * solució, la casella queda bloquejada i associada al jugador.
-     *
-     * @return true si el valor era correcte
-     */
-    synchronized boolean tryFill(int row, int col, int value, String owner) {
-        boolean correct = solution[row][col] == value;
-        if (correct) {
-            filledValue[row][col] = value;
-            filledOwner[row][col] = owner;
-            filledCount++;
+    synchronized MoveResult move(String player, int row, int col, int value) {
+        if (!scores.containsKey(player)) return MoveResult.INVALID;
+        if (row < 0 || row >= SIZE || col < 0 || col >= SIZE || value < 1 || value > 9) {
+            return MoveResult.INVALID;
         }
-        return correct;
-    }
+        if (finished) return MoveResult.FINISHED;
+        if (filled[row][col]) return MoveResult.LOCKED;
 
-    /** La partida ha acabat quan totes les 81 caselles estan plenes. */
-    boolean isFinished() {
-        return givenCount + filledCount >= 81;
-    }
-
-    JSONArray givensAsJson() {
-        JSONArray rows = new JSONArray();
-        for (int r = 0; r < 9; r++) {
-            JSONArray row = new JSONArray();
-            for (int c = 0; c < 9; c++) {
-                row.put(givens[r][c]);
-            }
-            rows.put(row);
+        if (puzzle.solution[row][col] == value) {
+            filled[row][col] = true;
+            owner[row][col] = player;
+            scores.merge(player, POINTS_CORRECT, Integer::sum);
+            finished = allFilled();
+            return MoveResult.CORRECT;
         }
-        return rows;
+        scores.merge(player, POINTS_WRONG, Integer::sum);
+        return MoveResult.WRONG;
     }
 
-    JSONArray filledAsJson() {
-        JSONArray arr = new JSONArray();
-        for (int r = 0; r < 9; r++) {
-            for (int c = 0; c < 9; c++) {
-                if (filledValue[r][c] != 0) {
-                    JSONObject o = new JSONObject();
-                    o.put("row", r);
-                    o.put("col", c);
-                    o.put("value", filledValue[r][c]);
-                    o.put("owner", filledOwner[r][c]);
-                    arr.put(o);
-                }
-            }
+    private boolean allFilled() {
+        for (boolean[] row : filled) {
+            for (boolean b : row) if (!b) return false;
         }
-        return arr;
+        return true;
     }
+
+    synchronized boolean isFinished() { return finished; }
+
+    /** Valor visible de la casella (0 si està buida). */
+    synchronized int valueAt(int r, int c) { return filled[r][c] ? puzzle.solution[r][c] : 0; }
+
+    synchronized boolean isGiven(int r, int c) { return puzzle.given[r][c]; }
+
+    /** Jugador que ha encertat la casella (null si és pista o buida). */
+    synchronized String ownerAt(int r, int c) { return owner[r][c]; }
+
+    /** Jugadors ordenats per punts (descendent) i després per nom. */
+    synchronized List<Map.Entry<String, Integer>> ranking() {
+        List<Map.Entry<String, Integer>> list = new ArrayList<>(scores.entrySet());
+        list.sort((a, b) -> {
+            int cmp = Integer.compare(b.getValue(), a.getValue());
+            return cmp != 0 ? cmp : a.getKey().compareToIgnoreCase(b.getKey());
+        });
+        return list;
+    }
+
+    // Només per a proves
+    synchronized int solutionAt(int r, int c) { return puzzle.solution[r][c]; }
 }

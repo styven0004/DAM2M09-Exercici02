@@ -10,11 +10,11 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
-<AnchorPane fx:id="anchor" minHeight="560.0" minWidth="760.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.clientFX.CtrlConfig">
+<AnchorPane fx:id="anchor" minHeight="500.0" minWidth="600.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.clientFX.CtrlConfig">
    <children>
       <VBox alignment="CENTER" prefHeight="200.0" prefWidth="100.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
          <children>
-            <Label alignment="CENTER" prefHeight="17.0" prefWidth="600.0" text="Sudoku multijugador" VBox.vgrow="NEVER">
+            <Label alignment="CENTER" prefHeight="17.0" prefWidth="600.0" text="Sudoku - Server setup" VBox.vgrow="NEVER">
                <font>
                   <Font size="36.0" />
                </font>
@@ -22,12 +22,12 @@
                   <Insets top="16.0" />
                </VBox.margin>
             </Label>
-            <Pane prefHeight="80.0" prefWidth="200.0" />
+            <Pane prefHeight="200.0" prefWidth="200.0" />
             <HBox alignment="CENTER" prefHeight="75.0" VBox.vgrow="NEVER">
                <children>
                   <VBox alignment="CENTER_RIGHT" prefHeight="200.0" prefWidth="100.0" HBox.hgrow="ALWAYS">
                      <children>
-                        <Label text="El teu nom">
+                        <Label text="Player name">
                            <font>
                               <Font size="14.0" />
                            </font>
@@ -39,8 +39,11 @@
                   </VBox>
                   <VBox alignment="CENTER_LEFT" prefHeight="200.0" prefWidth="100.0" HBox.hgrow="ALWAYS">
                      <children>
-                        <TextField fx:id="txtName" promptText="Albert" VBox.vgrow="NEVER" />
+                        <TextField fx:id="txtName" promptText="El teu nom" VBox.vgrow="NEVER" />
                      </children>
+                     <HBox.margin>
+                        <Insets />
+                     </HBox.margin>
                      <padding>
                         <Insets right="64.0" />
                      </padding>
@@ -68,6 +71,9 @@
                      <children>
                         <TextField fx:id="txtProtocol" text="ws" VBox.vgrow="NEVER" />
                      </children>
+                     <HBox.margin>
+                        <Insets />
+                     </HBox.margin>
                      <padding>
                         <Insets right="64.0" />
                      </padding>
@@ -95,6 +101,9 @@
                      <children>
                         <TextField fx:id="txtHost" text="localhost" VBox.vgrow="NEVER" />
                      </children>
+                     <HBox.margin>
+                        <Insets />
+                     </HBox.margin>
                      <padding>
                         <Insets right="64.0" />
                      </padding>
@@ -122,13 +131,16 @@
                      <children>
                         <TextField fx:id="txtPort" text="3000" VBox.vgrow="NEVER" />
                      </children>
+                     <HBox.margin>
+                        <Insets />
+                     </HBox.margin>
                      <padding>
                         <Insets right="64.0" />
                      </padding>
                   </VBox>
                </children>
             </HBox>
-            <Button mnemonicParsing="false" onAction="#connectToServer" text="Connect" VBox.vgrow="NEVER">
+            <Button fx:id="btnConnect" mnemonicParsing="false" onAction="#connectToServer" text="Connect" VBox.vgrow="NEVER">
                <VBox.margin>
                   <Insets top="16.0" />
                </VBox.margin>
@@ -141,7 +153,11 @@
             <Pane prefHeight="200.0" prefWidth="200.0" VBox.vgrow="ALWAYS" />
             <HBox alignment="BOTTOM_LEFT" prefHeight="75.0">
                <children>
-                  <Button mnemonicParsing="false" onAction="#setConfigLocal" text="Local" />
+                  <Button mnemonicParsing="false" onAction="#setConfigLocal" text="Local">
+                     <HBox.margin>
+                        <Insets />
+                     </HBox.margin>
+                  </Button>
                   <Button mnemonicParsing="false" onAction="#setConfigProxmox" text="Proxmox">
                      <HBox.margin>
                         <Insets left="8.0" />

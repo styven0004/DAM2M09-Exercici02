@@ -1,5 +1,9 @@
 package com.clientFX;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import javafx.animation.PauseTransition;
@@ -7,22 +11,15 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
-/**
- * Aplicació JavaFX del client del Sudoku multijugador.
- *
- * Gestiona les tres vistes (configuració, joc i classificació) i tota la
- * comunicació amb el servidor per WebSockets: connexió, unió a la partida
- * amb un nom, enviament de jugades i recepció de l'estat de la partida.
- */
 public class Main extends Application {
 
     public static UtilsWS wsClient;
 
-    /** Nom amb què el jugador ha estat registrat pel servidor. */
     public static String playerName = "";
 
     public static CtrlConfig ctrlConfig;
@@ -30,14 +27,16 @@ public class Main extends Application {
     public static CtrlRanking ctrlRanking;
 
     public static void main(String[] args) {
+
+        // Iniciar app JavaFX
         launch(args);
     }
 
     @Override
     public void start(Stage stage) throws Exception {
 
-        final int windowWidth = 760;
-        final int windowHeight = 560;
+        final int windowWidth = 800;
+        final int windowHeight = 700;
 
         UtilsViews.parentContainer.setStyle("-fx-font: 14 arial;");
         UtilsViews.addView(getClass(), "ViewConfig", "/assets/viewConfig.fxml");
@@ -48,7 +47,14 @@ public class Main extends Application {
         ctrlGame = (CtrlGame) UtilsViews.getController("ViewGame");
         ctrlRanking = (CtrlRanking) UtilsViews.getController("ViewRanking");
 
-        Scene scene = new Scene(UtilsViews.parentContainer);
+        Scene scene = new Scene(UtilsViews.parentContainer, windowWidth, windowHeight);
+
+        // El teclat només s'envia al tauler quan la vista de partida és la activa
+        scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if ("ViewGame".equals(UtilsViews.getActiveView())) {
+                ctrlGame.handleKey(event);
+            }
+        });
 
         stage.setScene(scene);
         stage.setTitle("Sudoku multijugador");
@@ -56,12 +62,14 @@ public class Main extends Application {
         stage.setMinHeight(windowHeight);
         stage.show();
 
+        // Add icon only if not Mac
         if (!System.getProperty("os.name").contains("Mac")) {
-            try {
-                Image icon = new Image(getClass().getResourceAsStream("/icons/icon.png"));
-                stage.getIcons().add(icon);
-            } catch (Exception ignored) {
-                // Sense icona no és crític per al funcionament del joc
+            // try-with-resources: si no es tanca el stream, Windows deixa icon.png
+            // bloquejat i un altre "mvn clean" no pot esborrar target/
+            try (var iconStream = Main.class.getResourceAsStream("/icons/icon.png")) {
+                if (iconStream != null) {
+                    stage.getIcons().add(new Image(iconStream));
+                }
             }
         }
     }
@@ -80,32 +88,54 @@ public class Main extends Application {
         pause.play();
     }
 
-    /** Es crida des de la vista de configuració en prémer "Connect". */
+    public static <T> List<T> jsonArrayToList(JSONArray array, Class<T> clazz) {
+        List<T> list = new ArrayList<>();
+        for (int i = 0; i < array.length(); i++) {
+            T value = clazz.cast(array.get(i));
+            list.add(value);
+        }
+        return list;
+    }
+
+    // ----------------- Connexió -----------------
+
     public static void connectToServer() {
 
-        ctrlConfig.txtMessage.setTextFill(Color.BLACK);
-        ctrlConfig.txtMessage.setText("Connectant...");
+        String name = ctrlConfig.txtName.getText().trim();
+        if (name.isEmpty()) {
+            ctrlConfig.txtMessage.setTextFill(Color.RED);
+            ctrlConfig.txtMessage.setText("Escriu el teu nom");
+            return;
+        }
+        playerName = name;
 
-        pauseDuring(500, () -> {
+        ctrlConfig.btnConnect.setDisable(true);
+        ctrlConfig.txtMessage.setTextFill(Color.BLACK);
+        ctrlConfig.txtMessage.setText("Connecting ...");
+
+        pauseDuring(1000, () -> { // Give time to show connecting message ...
 
             String protocol = ctrlConfig.txtProtocol.getText();
             String host = ctrlConfig.txtHost.getText();
             String port = ctrlConfig.txtPort.getText();
-            String requestedName = ctrlConfig.txtName.getText();
-            playerName = (requestedName == null || requestedName.isBlank())
-                    ? "Jugador" : requestedName.trim();
-
             wsClient = UtilsWS.getSharedInstance(protocol + "://" + host + ":" + port);
 
-            // Platform.runLater assegura que el codi s'executi
+            // Platform.runlater assegura que el codi s'executi
             // al fil de la UI, per evitar problemes de concurrència amb JavaFX
-            wsClient.onOpen((response) -> { Platform.runLater(Main::sendJoin); });
+            wsClient.onOpen((response) -> sendJoin());
             wsClient.onMessage((response) -> { Platform.runLater(() -> { wsMessage(response); }); });
             wsClient.onError((response) -> { Platform.runLater(() -> { wsError(response); }); });
+            wsClient.onClose((response) -> { Platform.runLater(() -> { wsClose(); }); });
+
+            // Si la connexió ja s'ha obert abans de registrar els callbacks
+            // (el servidor ignora un join repetit)
+            if (wsClient.isOpen()) {
+                sendJoin();
+            }
         });
     }
 
-    /** Envia el missatge "join" amb el nom del jugador un cop oberta la connexió. */
+    // Presentar-se al servidor amb el nom del jugador
     private static void sendJoin() {
         JSONObject obj = new JSONObject();
         obj.put("type", "join");
@@ -113,56 +143,80 @@ public class Main extends Application {
         wsClient.safeSend(obj.toString());
     }
 
-    /** Envia al servidor la jugada d'una casella. */
-    public static void sendMove(int row, int col, int value) {
+    // Botó "Tornar a jugar" de la vista de ranking
+    public static void playAgain() {
         JSONObject obj = new JSONObject();
-        obj.put("type", "move");
-        obj.put("row", row);
-        obj.put("col", col);
-        obj.put("value", value);
+        obj.put("type", "playAgain");
         wsClient.safeSend(obj.toString());
+        ctrlGame.showMessage("", Color.BLACK);
+        UtilsViews.setViewAnimating("ViewGame");
     }
 
-    /** Demana al servidor començar una partida nova. */
-    public static void sendRestart() {
-        JSONObject obj = new JSONObject();
-        obj.put("type", "restart");
-        wsClient.safeSend(obj.toString());
-    }
+    // ----------------- Missatges del servidor -----------------
 
     private static void wsMessage(String response) {
+        // Fer aquí els canvis a la interficie
         JSONObject msgObj = new JSONObject(response);
         String type = msgObj.optString("type", "");
 
         switch (type) {
             case "joined" -> {
-                playerName = msgObj.getString("name");
+                ctrlGame.showMessage("", Color.BLACK);
+                // El servidor pot haver canviat el nom si ja n'hi havia un igual
+                playerName = msgObj.getString("id");
                 ctrlGame.setPlayerName(playerName);
-                UtilsViews.setViewAnimating("ViewGame");
             }
-            case "state" -> {
-                ctrlGame.updateState(msgObj);
-                if (msgObj.optBoolean("finished", false)) {
-                    ctrlRanking.updateRanking(msgObj);
-                    UtilsViews.setViewAnimating("ViewRanking");
-                } else if ("ViewRanking".equals(UtilsViews.getActiveView())) {
-                    UtilsViews.setViewAnimating("ViewGame");
-                }
+            case "state" -> handleState(msgObj);
+            case "result" -> ctrlGame.showResult(msgObj);
+            case "error" -> System.out.println("Server error: " + msgObj.optString("message"));
+            default -> { }
+        }
+    }
+
+    private static void handleState(JSONObject state) {
+        ctrlGame.updateState(state);
+
+        String active = UtilsViews.getActiveView();
+        boolean finished = "finished".equals(state.getString("status"));
+
+        if (finished) {
+            // Partida acabada: ranking final de tots els jugadors
+            ctrlRanking.setRanking(state.getJSONArray("players"), playerName);
+            if (!"ViewRanking".equals(active)) {
+                UtilsViews.setViewAnimating("ViewRanking");
             }
-            case "wrong" -> ctrlGame.flashWrong(msgObj.getInt("row"), msgObj.getInt("col"));
-            case "error" -> System.out.println("Error del servidor: " + msgObj.optString("message", ""));
-            default -> { /* Tipus no gestionat */ }
+        } else if ("ViewConfig".equals(active)) {
+            // Primer estat rebut després de connectar: a jugar
+            UtilsViews.setViewAnimating("ViewGame");
         }
     }
 
     private static void wsError(String response) {
+
+        // Només es mostra a la vista de configuració (mentre encara no s'ha connectat)
+        if (!"ViewConfig".equals(UtilsViews.getActiveView())) {
+            return;
+        }
+
         String connectionRefused = "Connection refused";
-        if (response.contains(connectionRefused)) {
-            ctrlConfig.txtMessage.setTextFill(Color.RED);
-            ctrlConfig.txtMessage.setText(connectionRefused);
-            pauseDuring(1500, () -> {
-                ctrlConfig.txtMessage.setText("");
-            });
+        String text = response.contains(connectionRefused) ? connectionRefused : "Error de connexió";
+
+        ctrlConfig.txtMessage.setTextFill(Color.RED);
+        ctrlConfig.txtMessage.setText(text);
+
+        // Descartem la connexió per poder provar una altra adreça
+        UtilsWS.resetSharedInstance();
+        ctrlConfig.btnConnect.setDisable(false);
+
+        pauseDuring(2500, () -> {
+            ctrlConfig.txtMessage.setText("");
+        });
+    }
+
+    private static void wsClose() {
+        // Si es perd la connexió durant la partida, UtilsWS reintenta cada 5 s
+        if ("ViewGame".equals(UtilsViews.getActiveView())) {
+            ctrlGame.showMessage("Connexió perduda, reconnectant ...", Color.web("#c62828"));
         }
     }
 }

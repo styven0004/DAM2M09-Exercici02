@@ -2,34 +2,38 @@
 
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Label?>
-<?import javafx.scene.control.Separator?>
 <?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
-<?import javafx.scene.text.Font?>
 
-<AnchorPane fx:id="anchor" minHeight="560.0" minWidth="760.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.clientFX.CtrlGame">
+<AnchorPane minHeight="640.0" minWidth="760.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.clientFX.CtrlGame">
    <children>
-      <Label fx:id="lblPlayer" text="Juga: " AnchorPane.leftAnchor="20.0" AnchorPane.topAnchor="15.0">
-         <font>
-            <Font size="20.0" />
-         </font>
-      </Label>
-
-      <GridPane fx:id="gridSudoku" style="-fx-background-color: #333333;" AnchorPane.leftAnchor="20.0" AnchorPane.topAnchor="60.0" />
-
-      <Separator orientation="VERTICAL" AnchorPane.bottomAnchor="15.0" AnchorPane.rightAnchor="190.0" AnchorPane.topAnchor="15.0" />
-
-      <Label text="Jugadors" AnchorPane.rightAnchor="20.0" AnchorPane.topAnchor="15.0">
-         <font>
-            <Font size="20.0" />
-         </font>
-      </Label>
-
-      <VBox fx:id="boxPlayers" prefWidth="170.0" spacing="4.0" AnchorPane.bottomAnchor="15.0" AnchorPane.rightAnchor="20.0" AnchorPane.topAnchor="60.0">
+      <HBox spacing="24.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
          <padding>
-            <Insets top="8.0" />
+            <Insets bottom="16.0" left="16.0" right="16.0" top="16.0" />
          </padding>
-      </VBox>
+         <children>
+            <!-- Esquerra: nom del jugador, tauler i teclat -->
+            <VBox alignment="TOP_CENTER" spacing="12.0" HBox.hgrow="ALWAYS">
+               <children>
+                  <Label fx:id="txtPlayer" style="-fx-font-size: 26px; -fx-font-weight: bold;" text="Juga: " />
+                  <GridPane fx:id="boardGrid" alignment="CENTER" />
+                  <HBox fx:id="padBox" alignment="CENTER" spacing="6.0" />
+                  <Label fx:id="txtMessage" minHeight="24.0" style="-fx-font-size: 16px;" />
+               </children>
+            </VBox>
+            <!-- Dreta: jugadors i puntuació -->
+            <VBox minWidth="220.0" prefWidth="220.0" spacing="10.0" style="-fx-background-color: #f4f4f5; -fx-background-radius: 8;">
+               <padding>
+                  <Insets bottom="12.0" left="12.0" right="12.0" top="12.0" />
+               </padding>
+               <children>
+                  <Label style="-fx-font-size: 20px; -fx-font-weight: bold;" text="Jugadors" />
+                  <VBox fx:id="playersBox" spacing="4.0" />
+               </children>
+            </VBox>
+         </children>
+      </HBox>
    </children>
 </AnchorPane>

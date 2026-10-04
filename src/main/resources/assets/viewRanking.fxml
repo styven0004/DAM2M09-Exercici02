@@ -1,25 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.layout.VBox?>
-<?import javafx.scene.text.Font?>
 
-<AnchorPane fx:id="anchor" minHeight="560.0" minWidth="760.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.clientFX.CtrlRanking">
+<AnchorPane minHeight="500.0" minWidth="600.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.clientFX.CtrlRanking">
    <children>
-      <Label alignment="CENTER" prefWidth="760.0" text="Classificació final" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="30.0">
-         <font>
-            <Font size="32.0" />
-         </font>
-      </Label>
-
-      <VBox fx:id="boxRanking" alignment="CENTER" prefWidth="760.0" spacing="6.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="120.0" />
-
-      <Button alignment="CENTER" mnemonicParsing="false" onAction="#playAgain" prefWidth="180.0" text="Tornar a jugar" AnchorPane.bottomAnchor="40.0" AnchorPane.leftAnchor="290.0">
-         <font>
-            <Font size="16.0" />
-         </font>
-      </Button>
+      <VBox alignment="TOP_CENTER" spacing="16.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+         <padding>
+            <Insets bottom="24.0" left="24.0" right="24.0" top="32.0" />
+         </padding>
+         <children>
+            <Label style="-fx-font-size: 36px; -fx-font-weight: bold;" text="Partida acabada" />
+            <Label fx:id="txtWinner" style="-fx-font-size: 20px;" />
+            <VBox fx:id="rankingBox" maxWidth="420.0" spacing="6.0" />
+            <Button mnemonicParsing="false" onAction="#playAgain" style="-fx-font-size: 18px;" text="Tornar a jugar">
+               <VBox.margin>
+                  <Insets top="16.0" />
+               </VBox.margin>
+            </Button>
+         </children>
+      </VBox>
    </children>
 </AnchorPane>
